@@ -1,0 +1,132 @@
+#!/bin/bash
+# Author           : Marek Zalewski ( s180465@student.pg.edu.pl )
+# Created On       : 23/04/2020
+# Last Modified By : Marek Zalewski
+# Last Modified On : 23/04/2020
+# Version          : 1.0.0
+# Name             : organizer
+#
+# Description      :
+# Duży skrypt z systemów operacyjnych: task scheduler
+#
+# Licensed under GPL (see /usr/share/common-licenses/GPL for more details
+# or contact # the Free Software Foundation for a copy)
+
+# used programs:
+# echo, printf, kill, ps, grep, sort, zenity, test, read, cat, ls, date, awk, cut, mkdir
+
+
+configPath="$HOME/.organizer"
+fileWithSchedule="$configPath/taskSchedule"
+configFile="$configPath/configFile"
+
+workTime=60
+breakTime=15;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+create_config_file() {
+	echo  $workTime > $configFile
+	echo $breakTime >> $configFile
+}
+
+load_config() {
+	if [[ ! (-d $configPath) ]]; then
+		`eval "mkdir $configPath"`
+	fi
+	if [[ ! (-e $configFile && -f $configFile) ]]; then
+		create_config_file
+	else
+		exec 5< "$configFile"
+			read workTime <&5
+			read breakTime <&5
+		exec 5<&-
+	fi
+}
+
+load_config
+
+if [[ $# -ne 1 ]]; then
+	case $1 in
+		"callcyclicday")
+			
+		;;
+		"pomodoro")
+		;;
+		"callonetimeevent")
+		;;
+		"callevent")
+		;;
+	esac
+else
+	default_user_interafce
+fi
+
+
+
+
+
+
+
+
+
+
+exit
+
+# read from file line by line
+input="script.sh"
+lineNumber=1
+while IFS= read -r line
+do
+	echo "$lineNumber"": $line"
+	lineNumber=$(($lineNumber+1))
+done < "$input"
+
+# start daemon:
+setsid
+
+# process:
+fork()
+
+# get current date:
+currentDate=`printf '%(%Y-%m-%d)T\n' -1`
+
+# get date from zenity:
+selectedDate=`zenity --calendar --date-format='%Y-%m-%d'`
+
+# overwrite file:
+ echo ... > file
+
+# append to file:
+echo ... >> file
+
+
+# get process by PID:
+ps ax | grep "^ *$PID"
+
+# kill process by pid:
+kill $PID
+
+# create process and get PID
+function_or_script_to_call &
+pid=$!
+
