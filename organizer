@@ -28,15 +28,144 @@ breakTime=15;
 
 
 
+prepare_date() {
+	echo $1 | sed -E 's/^([0-9]+-[0-9]+-[0-9]+)-([0-9]+)-([0-9]+)$/\1 \2\:\3/g'
+}
 
 
+list_events() {
+	local lineNumber=0
+	local line=""
+	local eventsList=()
+	while read line;
+	do
+		if [[ $line != "" ]]; then
+			local timeStamp=`echo $line | sed -E 's/^([^ ]+) .*$/\1/g'`
+			local mode=`echo $line | sed -E 's/^([^ ]+) ([^ ]+) .*$/\2/g'`
+			local text=`echo $line | sed -E 's/^([^ ]+) ([^ ]+) (.*)$/\3/g'`
+			
+			eventsList[$(( lineNumber*3 ))]=$(prepare_date $timeStamp)
+			if [[ $mode == "event" ]]; then
+				mode="Wydarzenie jednorazowe"
+			else
+				mode="Wydarzenie okresowe: "$(prepare_date $mode)
+			fi
+			
+			eventsList[$(( lineNumber*3 + 1 ))]=$mode
+			eventsList[$(( lineNumber*3 + 2 ))]=$text
+			
+			lineNumber=$(($lineNumber+1))
+		fi
+	done < "$fileWithSchedule"
+	
+	zenity --list --title "Lista wydarzeń" --column="Data" --column="Rodzaj" --column="Treść" "${eventsList[@]}"
+}
 
+remove_events() {
+	local lineNumber=0
+	local line=""
+	local eventsList=()
+	while read line;
+	do
+		if [[ $line != "" ]]; then
+			local timeStamp=`echo $line | sed -E 's/^([^ ]+) .*$/\1/g'`
+			local mode=`echo $line | sed -E 's/^([^ ]+) ([^ ]+) .*$/\2/g'`
+			local text=`echo $line | sed -E 's/^([^ ]+) ([^ ]+) (.*)$/\3/g'`
+			
+			eventsList[$(( lineNumber*6 + 1 ))]=$lineNumber
+			eventsList[$(( lineNumber*6 + 0 ))]=$timeStamp
+			eventsList[$(( lineNumber*6 + 2 ))]=$mode
+			
+			eventsList[$(( lineNumber*6 + 3 ))]=$(prepare_date $timeStamp)
+			if [[ $mode == "event" ]]; then
+				mode="Wydarzenie jednorazowe"
+			else
+				mode="Wydarzenie okresowe: "$(prepare_date $mode)
+			fi
+			
+			eventsList[$(( lineNumber*6 + 4 ))]=$mode
+			eventsList[$(( lineNumber*6 + 5 ))]=$text
+			
+			lineNumber=$(($lineNumber+1))
+		fi
+	done < "$fileWithSchedule"
+	local entries=$lineNumber
+	
+	local result=`zenity --list --checklist --title "Wybierz wydarzenia do usunięcia" "--column=" "--column=TimeStamp" "--column=HiddenMode" "--column=Data" "--column=Rodzaj" "--column=Treść" "${eventsList[@]}" --hide-column=2,3`
+	if [[ $result != "" ]]; then
+		local resultsArray=()
+		IFS="|" read -r -a resultsArray <<< "$result" 
+		
+		rm "$fileWithSchedule"
+		
+		for line in $(seq 0 $entries);
+		do
+			local found="0"
+			for element in "${resultsArray[@]}"
+			do
+				if [[ $element == $line ]]; then
+					found="1"
+				fi
+			done
+			if [[ $found == "0" ]]; then
+				echo "${eventsList[$(( $line*6 + 0 ))]} ${eventsList[$(( $line*6 + 2 ))]} ${eventsList[$(( $line*6 + 5 ))]}" >> "$fileWithSchedule"
+			fi
+		done
+	fi
+}
 
+get_number() {
+	local number=""
+	while [[ $(echo $number | sed -E 's/^([0-9]+)$/\1/g') == "" ]]; do
+		number=`zenity --entry --title "$1" --text="$2"`
+	done
+	echo $number
+}
 
+add_event() {
+	local date=`zenity --calendar --title "Data" --text="Wybierz datę wydarzenia" --date-format='%Y-%m-%d'`
+	local hour=`zenity --scale --title "Godzina" --text="Wybierz godzinę wydarzenia" --min-value=0 --max-value=23 --step=1`
+	local minute=`zenity --scale --title "Minuta" --text="Wybierz minutę wydarzenia" --min-value=0 --max-value=59 --step=1`
+	local text=`zenity --entry --title "Treść wydarzenia" --text="Napisz o czym jest wydarzenie"`
+	local mode="event"
+	if zenity --question --title "Typ wydarzenia" --text="Czy wydarzenie ma być okresowe?"
+	then
+		local years=`get_number "Lata" "Co ile lat ma się powtarzać wydarzenie?"`
+		local months=`zenity --scale --title "Miesiące" --text="Co ile miesięcy ma się powtarzać wydarzenie?" --min-value=0 --max-value=11 --step=1`
+		local days=`zenity --scale --title "Dni" --text="Co ile dni ma się powtarzać wydarzenie?" --min-value=0 --max-value=366 --step=1`
+		local hours=`zenity --scale --title "Godziny" --text="Co ile godzin ma się powtarzać wydarzenie?" --min-value=0 --max-value=23 --step=1`
+		local minutes=`zenity --scale --title "Minuty" --text="Co ile minut ma się powtarzać wydarzenie?" --min-value=0 --max-value=59 --step=1`
+		mode="$years-$months-$days-$hours-$minutes"
+	fi
+	date=$date"-"$hour"-"$minute
+	echo $date" :"$mode": "$text
+	echo "$date $mode $text" >> "$fileWithSchedule"
+	
+	local tmpFile="/tmp/$0.organizerFileWithSchedule.$$"
+	
+	cat "$fileWithSchedule" | sort > "$tmpFile"
+	
+	mv "$tmpFile" "$fileWithSchedule"
+}
 
-
-
-
+main_menu() {
+	local menulist=("exit" "Wyjscie"  "ls" "Pokaz liste wydarzeń"  "rm" "Usuń wydarzenie"  "add" "Dodaj wydarzenie")
+	local option=`zenity --list --title "Main Menu" --column=Hidden --column=Opcje "${menulist[@]}" --hide-column=1`
+	case $option in
+		"exit"|"")
+			exit
+			;;
+		"ls")
+			list_events
+			;;
+		"rm")
+			remove_events
+			;;
+		"add")
+			add_event
+			;;
+	esac
+}
 
 
 
@@ -65,21 +194,22 @@ load_config() {
 
 load_config
 
-if [[ $# -ne 1 ]]; then
-	case $1 in
-		"callcyclicday")
-			
+case $1 in
+	"callcyclicday")
 		;;
-		"pomodoro")
+	"pomodoro")
 		;;
-		"callonetimeevent")
+	"callonetimeevent")
 		;;
-		"callevent")
+	"callevent")
 		;;
-	esac
-else
-	default_user_interafce
-fi
+	*)
+		while [[ "1" == "1" ]]
+		do
+			main_menu
+		done
+		;;
+esac
 
 
 
@@ -109,6 +239,8 @@ fork()
 
 # get current date:
 currentDate=`printf '%(%Y-%m-%d)T\n' -1`
+modifiedGivenDate=`date -d '2000-02-10 02:00 minutes + 25 minutes + 3 hours + 2 days + 2 months + 2 years + -1 minutes' +%F-%H-%M`
+modifiedDate=`date -d 'now + 25 minutes + 3 hours + 2 days + 2 months + 2 years' +%F-%H-%M`
 
 # get date from zenity:
 selectedDate=`zenity --calendar --date-format='%Y-%m-%d'`
@@ -129,4 +261,6 @@ kill $PID
 # create process and get PID
 function_or_script_to_call &
 pid=$!
+
+
 
