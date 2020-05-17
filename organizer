@@ -2,7 +2,7 @@
 # Author           : Marek Zalewski ( s180465@student.pg.edu.pl )
 # Created On       : 23/04/2020
 # Last Modified By : Marek Zalewski
-# Last Modified On : 23/04/2020
+# Last Modified On : 27/05/2020
 # Version          : 1.0.0
 # Name             : organizer
 #
@@ -11,10 +11,6 @@
 #
 # Licensed under GPL (see /usr/share/common-licenses/GPL for more details
 # or contact # the Free Software Foundation for a copy)
-
-# used programs:
-# echo, printf, kill, ps, grep, sort, zenity, test, read, cat, ls, date, awk, cut, mkdir
-
 
 configPath="$HOME/.organizer"
 fileWithSchedule="$configPath/taskSchedule"
@@ -32,6 +28,86 @@ prepare_date() {
 	echo $1 | sed -E 's/^([0-9]+-[0-9]+-[0-9]+)-([0-9]+)-([0-9]+)$/\1 \2\:\3/g'
 }
 
+get_current_date() {
+	date -d 'now' +%F-%H-%M
+}
+
+get_modification_date_formatted() {
+	echo $1 | sed -E 's/^([0-9]+)-([0-9]+)-([0-9]+)-([0-9]+)-([0-9i]+)$/+ \1 years + \2 months + \3 days + \4 hours + \5 minutes + -1 minutes/g'
+}
+
+get_next_valid_date() {
+	local currentDate=$(get_current_date)
+	local savedDate="$1"
+	local modificationString=$(get_modification_date_formatted $2)
+	while [[ "$savedDate" < "$currentDate" ]];
+	do
+		local newDate="$(prepare_date "$savedDate") minutes"
+		savedDate=`date -d "$newDate $modificationString" +%F-%H-%m`
+	done
+	echo "$savedDate"
+}
+
+proceed_with_event() {
+	local mode=$2
+	if [[ "$mode" == "event" ]]; then
+		mode="Wydarzenie jednorazowe"
+	else
+		mode="Wydarzenie okresowe co: "$(prepare_date $mode)
+	fi
+	local message="$mode \nwystąpiło: $(prepare_date $1) \n$3"
+	
+	zenity --notfication --title "Wydarzenie" --text="message" &
+	
+	if [[ "$2" != "event" ]]; then
+		local newDate=$(get_next_valid_date $1 $2)
+		echo "$newDate $2 $3"
+	else
+		echo ""
+	fi
+}
+
+daemon_function() {
+	local line=""
+	local tmpFile="/tmp/$0.organizerFileWithSchedule.$$"
+	while read line;
+	do
+		if [[ "$line" != "" ]]; then
+			local timeStamp=`echo $line | sed -E 's/^([^ ]+) .*$/\1/g'`
+			local mode=`echo $line | sed -E 's/^([^ ]+) ([^ ]+) .*$/\2/g'`
+			local text=`echo $line | sed -E 's/^([^ ]+) ([^ ]+) (.*)$/\3/g'`
+			
+			local eventReplacer=$(proceed_with_event $timeStamp $mode $text)
+			if [[ "$eventReplacer" != "" ]]; then
+				echo "$eventReplacer" >> "$tmpFile"
+			fi
+		fi
+	done < "$fileWithSchedule"
+	
+	
+	for line in $(seq 0 $entries);
+	do
+		eventDone=$(proceed_with_event)
+		local found="0"
+		for element in "${resultsArray[@]}"
+		do
+			if [[ "$element" == "$line" ]]; then
+				found="1"
+			fi
+		done
+		if [[ "$found" == "0" ]]; then
+			echo "${eventsList[$(( $line*6 + 0 ))]} ${eventsList[$(( $line*6 + 2 ))]} ${eventsList[$(( $line*6 + 5 ))]}" >> "$fileWithSchedule"
+		fi
+	done
+	
+	mv "$tmpFile" "$fileWithSchedule"
+	
+	sleep 60
+}
+
+
+
+
 
 list_events() {
 	local lineNumber=0
@@ -39,13 +115,13 @@ list_events() {
 	local eventsList=()
 	while read line;
 	do
-		if [[ $line != "" ]]; then
+		if [[ "$line" != "" ]]; then
 			local timeStamp=`echo $line | sed -E 's/^([^ ]+) .*$/\1/g'`
 			local mode=`echo $line | sed -E 's/^([^ ]+) ([^ ]+) .*$/\2/g'`
 			local text=`echo $line | sed -E 's/^([^ ]+) ([^ ]+) (.*)$/\3/g'`
 			
 			eventsList[$(( lineNumber*3 ))]=$(prepare_date $timeStamp)
-			if [[ $mode == "event" ]]; then
+			if [[ "$mode" == "event" ]]; then
 				mode="Wydarzenie jednorazowe"
 			else
 				mode="Wydarzenie okresowe: "$(prepare_date $mode)
@@ -67,7 +143,7 @@ remove_events() {
 	local eventsList=()
 	while read line;
 	do
-		if [[ $line != "" ]]; then
+		if [[ "$line" != "" ]]; then
 			local timeStamp=`echo $line | sed -E 's/^([^ ]+) .*$/\1/g'`
 			local mode=`echo $line | sed -E 's/^([^ ]+) ([^ ]+) .*$/\2/g'`
 			local text=`echo $line | sed -E 's/^([^ ]+) ([^ ]+) (.*)$/\3/g'`
@@ -77,7 +153,7 @@ remove_events() {
 			eventsList[$(( lineNumber*6 + 2 ))]=$mode
 			
 			eventsList[$(( lineNumber*6 + 3 ))]=$(prepare_date $timeStamp)
-			if [[ $mode == "event" ]]; then
+			if [[ "$mode" == "event" ]]; then
 				mode="Wydarzenie jednorazowe"
 			else
 				mode="Wydarzenie okresowe: "$(prepare_date $mode)
@@ -92,31 +168,34 @@ remove_events() {
 	local entries=$lineNumber
 	
 	local result=`zenity --list --checklist --title "Wybierz wydarzenia do usunięcia" "--column=" "--column=TimeStamp" "--column=HiddenMode" "--column=Data" "--column=Rodzaj" "--column=Treść" "${eventsList[@]}" --hide-column=2,3`
-	if [[ $result != "" ]]; then
+	
+	if [[ "$result" != "" ]]; then
 		local resultsArray=()
 		IFS="|" read -r -a resultsArray <<< "$result" 
 		
-		rm "$fileWithSchedule"
+		local tmpFile="/tmp/$0.organizerFileWithSchedule.$$"
 		
 		for line in $(seq 0 $entries);
 		do
 			local found="0"
 			for element in "${resultsArray[@]}"
 			do
-				if [[ $element == $line ]]; then
+				if [[ "$element" == "$line" ]]; then
 					found="1"
 				fi
 			done
-			if [[ $found == "0" ]]; then
-				echo "${eventsList[$(( $line*6 + 0 ))]} ${eventsList[$(( $line*6 + 2 ))]} ${eventsList[$(( $line*6 + 5 ))]}" >> "$fileWithSchedule"
+			if [[ "$found" == "0" ]]; then
+				echo "${eventsList[$(( $line*6 + 0 ))]} ${eventsList[$(( $line*6 + 2 ))]} ${eventsList[$(( $line*6 + 5 ))]}" >> "$tmpFile"
 			fi
 		done
+		
+		mv "$tmpFile" "$fileWithSchedule"
 	fi
 }
 
 get_number() {
 	local number=""
-	while [[ $(echo $number | sed -E 's/^([0-9]+)$/\1/g') == "" ]]; do
+	while [[ "$(echo $number | sed -E 's/^([0-9]+)$/\1/g')" == "" ]]; do
 		number=`zenity --entry --title "$1" --text="$2"`
 	done
 	echo $number
@@ -138,7 +217,6 @@ add_event() {
 		mode="$years-$months-$days-$hours-$minutes"
 	fi
 	date=$date"-"$hour"-"$minute
-	echo $date" :"$mode": "$text
 	echo "$date $mode $text" >> "$fileWithSchedule"
 	
 	local tmpFile="/tmp/$0.organizerFileWithSchedule.$$"
@@ -148,8 +226,37 @@ add_event() {
 	mv "$tmpFile" "$fileWithSchedule"
 }
 
+is_daemon_running() {
+	local daemonProcess=$(ps ax | grep 'organizer startdaemon' | grep -v "grep")
+	if [[ "$daemonProcess" == "" ]]; then
+		echo "0"
+	else
+		echo "1"
+	fi
+}
+
+kill_daemon() {
+	local daemonProcess=$(ps ax | grep 'organizer startdaemon' | grep -v "grep")
+	local line=""
+	while read line;
+	do
+		local daemonPID=`echo $line | sed -E 's/^[^0-9]*([0-9]+).*$/\1/g'`
+		if [[ "$daemonPID" != "" ]]; then
+			kill "$daemonPID"
+		fi
+	done <<< "$daemonProcess"
+}
+
+
+
+
 main_menu() {
-	local menulist=("exit" "Wyjscie"  "ls" "Pokaz liste wydarzeń"  "rm" "Usuń wydarzenie"  "add" "Dodaj wydarzenie")
+	local menuList=()
+	if [[ "$(is_daemon_running)" == "0" ]]; then
+		menulist=("exit" "Wyjscie"  "ls" "Pokaz liste wydarzeń"  "rm" "Usuń wydarzenie"  "add" "Dodaj wydarzenie"  "startdaemon" "Uruchom daemona")
+	else
+		menulist=("exit" "Wyjście"  "killdaemon" "Wyłącz daemona - aby móc modyfikować lub wyświetlić listę wydarzeń")
+	fi
 	local option=`zenity --list --title "Main Menu" --column=Hidden --column=Opcje "${menulist[@]}" --hide-column=1`
 	case $option in
 		"exit"|"")
@@ -164,14 +271,14 @@ main_menu() {
 		"add")
 			add_event
 			;;
+		"startdaemon")
+			$0 startdaemon & > /dev/null 2>&1
+			;;
+		"killdaemon")
+			kill_daemon
+			;;
 	esac
 }
-
-
-
-
-
-
 
 create_config_file() {
 	echo  $workTime > $configFile
@@ -182,7 +289,7 @@ load_config() {
 	if [[ ! (-d $configPath) ]]; then
 		`eval "mkdir $configPath"`
 	fi
-	if [[ ! (-e $configFile && -f $configFile) ]]; then
+	if [[ ! (-e "$configFile" && -f "$configFile") ]]; then
 		create_config_file
 	else
 		exec 5< "$configFile"
@@ -195,13 +302,17 @@ load_config() {
 load_config
 
 case $1 in
-	"callcyclicday")
+	"startdaemon")
+		while [[ "1" == "1" ]]
+		do
+			daemon_function
+		done
 		;;
-	"pomodoro")
+	"-v"|"--version")
+		
 		;;
-	"callonetimeevent")
-		;;
-	"callevent")
+	"-h"|"--help"|"?"|"help")
+		
 		;;
 	*)
 		while [[ "1" == "1" ]]
