@@ -2,27 +2,28 @@
 # Author           : Marek Zalewski ( s180465@student.pg.edu.pl )
 # Created On       : 23/04/2020
 # Last Modified By : Marek Zalewski
-# Last Modified On : 27/05/2020
+# Last Modified On : 18/05/2020
 # Version          : 1.0.0
 # Name             : organizer
 #
+# Tested and created on: Arch Linux 5.6.3-arch1-1
+#
 # Description      :
-# Duży skrypt z systemów operacyjnych: task scheduler
+# Duży skrypt z systemów operacyjnych: organizer
 #
 # Licensed under GPL (see /usr/share/common-licenses/GPL for more details
 # or contact # the Free Software Foundation for a copy)
 
 configPath="$HOME/.organizer"
 fileWithSchedule="$configPath/taskSchedule"
-configFile="$configPath/configFile"
-
-workTime=60
-breakTime=15;
 
 
+tmpFilenameUniquer=$$
 
-
-
+create_tmp_file_name() {
+	tmpFilenameUniquer=$(($tmpFilenameUniquer+13))
+	echo "/tmp/$$.$tmpFilenameUniquer"".tmp"
+}
 
 prepare_date() {
 	echo $1 | sed -E 's/^([0-9]+-[0-9]+-[0-9]+)-([0-9]+)-([0-9]+)$/\1 \2\:\3/g'
@@ -69,7 +70,7 @@ proceed_with_event() {
 
 daemon_function() {
 	local line=""
-	local tmpFile="/tmp/$0.organizerFileWithSchedule.$$"
+	local tmpFile=$(create_tmp_file_name)
 	while read line;
 	do
 		if [[ "$line" != "" ]]; then
@@ -83,22 +84,6 @@ daemon_function() {
 			fi
 		fi
 	done < "$fileWithSchedule"
-	
-	
-	for line in $(seq 0 $entries);
-	do
-		eventDone=$(proceed_with_event)
-		local found="0"
-		for element in "${resultsArray[@]}"
-		do
-			if [[ "$element" == "$line" ]]; then
-				found="1"
-			fi
-		done
-		if [[ "$found" == "0" ]]; then
-			echo "${eventsList[$(( $line*6 + 0 ))]} ${eventsList[$(( $line*6 + 2 ))]} ${eventsList[$(( $line*6 + 5 ))]}" >> "$fileWithSchedule"
-		fi
-	done
 	
 	mv "$tmpFile" "$fileWithSchedule"
 	
@@ -173,7 +158,7 @@ remove_events() {
 		local resultsArray=()
 		IFS="|" read -r -a resultsArray <<< "$result" 
 		
-		local tmpFile="/tmp/$0.organizerFileWithSchedule.$$"
+		local tmpFile=$(create_tmp_file_name)
 		
 		for line in $(seq 0 $entries);
 		do
@@ -219,7 +204,7 @@ add_event() {
 	date=$date"-"$hour"-"$minute
 	echo "$date $mode $text" >> "$fileWithSchedule"
 	
-	local tmpFile="/tmp/$0.organizerFileWithSchedule.$$"
+	local tmpFile=$(create_tmp_file_name)
 	
 	cat "$fileWithSchedule" | sort > "$tmpFile"
 	
@@ -246,9 +231,6 @@ kill_daemon() {
 		fi
 	done <<< "$daemonProcess"
 }
-
-
-
 
 main_menu() {
 	local menuList=()
@@ -280,27 +262,6 @@ main_menu() {
 	esac
 }
 
-create_config_file() {
-	echo  $workTime > $configFile
-	echo $breakTime >> $configFile
-}
-
-load_config() {
-	if [[ ! (-d $configPath) ]]; then
-		`eval "mkdir $configPath"`
-	fi
-	if [[ ! (-e "$configFile" && -f "$configFile") ]]; then
-		create_config_file
-	else
-		exec 5< "$configFile"
-			read workTime <&5
-			read breakTime <&5
-		exec 5<&-
-	fi
-}
-
-load_config
-
 case $1 in
 	"startdaemon")
 		while [[ "1" == "1" ]]
@@ -308,11 +269,14 @@ case $1 in
 			daemon_function
 		done
 		;;
-	"-v"|"--version")
-		
+	"-v"|"--version"|"-V")
+		echo "Organizer 1.0.0"
+		echo "Created by Marek Zalewski s180465 PG ETI Student 2. semestru I stopnia kierunku Informatyki, grupa dziekańśka nr. 5, zajęcia pn_10"
+		echo "Last commit: 18.05.2020"
 		;;
-	"-h"|"--help"|"?"|"help")
-		
+	"-h"|"--help"|"?"|"help"|"-H")
+		echo "To run type in console: $0"
+		echo "Program is simple and self-explanatory in GUI"
 		;;
 	*)
 		while [[ "1" == "1" ]]
@@ -335,7 +299,7 @@ exit
 
 # read from file line by line
 input="script.sh"
-lineNumber=1
+kklineNumber=1
 while IFS= read -r line
 do
 	echo "$lineNumber"": $line"
