@@ -87,7 +87,6 @@ get_next_valid_date() {
 	do
 		local newDate="$(prepare_period_time_full "$savedDate")"
 		savedDate=`date -d "$newDate $modificationString" +%F-%H-%M`
-		echo "Modified date: $savedDate = + $modificationString" 1>&2
 	done
 	echo "$savedDate"
 }
@@ -101,7 +100,7 @@ proceed_with_event() {
 	fi
 	local message="$mode \nwystąpiło: $(prepare_date $1) \n$3"
 	
-	zenity --info --title "Wydarzenie" --text="$message"
+	zenity --info --title "Wydarzenie" --text="$message" --width=256
 	
 	if [[ "$2" != "event" ]]; then
 		local newDate=$(get_next_valid_date $1 $2)
@@ -157,7 +156,7 @@ list_events() {
 			if [[ "$mode" == "event" ]]; then
 				mode="Wydarzenie jednorazowe"
 			else
-				mode="Wydarzenie okresowe: "$(prepare_period_time $mode)
+				mode="Wydarzenie okresowe co: "$(prepare_period_time $mode)
 			fi
 			
 			eventsList[$(( lineNumber*3 + 1 ))]=$mode
@@ -230,33 +229,48 @@ get_number() {
 	local number=""
 	while [[ "1" == "1" ]]; do
 		number=`zenity --entry --title "$1" --text="$2"`
-		sed -n -E '/^([0-9]+)$/p' <<<"$number"
-		echo "Get number: $number" 1>&2
-		if  [[ "$(echo $number | sed -n -E '/^([0-9]+)$/p')" != "" ]]; then
+		number=$(sed -z 's/\n/,/g;s/,$/\n/' <<< "$number")
+		number=$(sed -n -E '/^([0-9]+)$/p' <<< "$number")
+		if  [[ "$number" != "" ]]; then
 			break;
 		fi
 		zenity --info --title "Błędna wartość" --text "Podana wartość nie jest liczbą całkowitą nie ujemną"
 	done
-	echo "$number"
+	echo "$(($number + 0))"
 }
 
 add_event() {
 	local date=`zenity --calendar --title "Data" --text="Wybierz datę wydarzenia" --date-format='%Y-%m-%d'`
 	local hour=`zenity --scale --title "Godzina" --text="Wybierz godzinę wydarzenia" --min-value=0 --max-value=23 --step=1`
 	local minute=`zenity --scale --title "Minuta" --text="Wybierz minutę wydarzenia" --min-value=0 --max-value=59 --step=1`
-	local text=`zenity --entry --title "Treść wydarzenia" --text="Napisz o czym jest wydarzenie"`
-	text=$(sed -z 's/\n/,/g;s/,$/\n/' <<< "$text")
+	while [[ "1" == "1" ]];
+	do
+		local text=`zenity --entry --title "Treść wydarzenia" --text="Napisz o czym jest wydarzenie"`
+		text=$(sed -z 's/\n/,/g;s/,$/\n/' <<< "$text")
+		if [[ "$text" != "" ]]; then
+			break
+		fi
+		zenity --info --title "Błąd" --text "Opis wydarzenia nie może być pusty"
+	done
 	local mode="event"
 	if zenity --question --title "Typ wydarzenia" --text="Czy wydarzenie ma być okresowe?"
 	then
-		local years=`get_number "Lata" "Co ile lat ma się powtarzać wydarzenie?"`
-		local months=`zenity --scale --title "Miesiące" --text="Co ile miesięcy ma się powtarzać wydarzenie?" --min-value=0 --max-value=11 --step=1`
-		local days=`zenity --scale --title "Dni" --text="Co ile dni ma się powtarzać wydarzenie?" --min-value=0 --max-value=366 --step=1`
-		local hours=`zenity --scale --title "Godziny" --text="Co ile godzin ma się powtarzać wydarzenie?" --min-value=0 --max-value=23 --step=1`
-		local minutes=`zenity --scale --title "Minuty" --text="Co ile minut ma się powtarzać wydarzenie?" --min-value=0 --max-value=59 --step=1`
-		mode="$years-$months-$days-$hours-$minutes"
+		while [[ "1" == "1" ]];
+		do
+			local years=`get_number "Lata" "Co ile lat ma się powtarzać wydarzenie?"`
+			local months=`zenity --scale --title "Miesiące" --text="Co ile miesięcy ma się powtarzać wydarzenie?" --min-value=0 --max-value=11 --step=1`
+			local days=`zenity --scale --title "Dni" --text="Co ile dni ma się powtarzać wydarzenie?" --min-value=0 --max-value=366 --step=1`
+			local hours=`zenity --scale --title "Godziny" --text="Co ile godzin ma się powtarzać wydarzenie?" --min-value=0 --max-value=23 --step=1`
+			local minutes=`zenity --scale --title "Minuty" --text="Co ile minut ma się powtarzać wydarzenie?" --min-value=0 --max-value=59 --step=1`
+			mode="$years-$months-$days-$hours-$minutes"
+			if [[ "$mode" != "0-0-0-0-0" ]]; then
+				break
+			fi
+			zenity --info --title "Błąd" --text "Wprowadzony okres powtarzania wydarzenia jest zerowy, wprowadź inny okres."
+		done
 	fi
-	date=$date"-"$hour"-"$minute
+	date=$(prepare_period_time_full "$date-$hour-$minute")
+	date=`date -d "$date" +%F-%H-%M`
 	echo "$date $mode $text" >> "$fileWithSchedule"
 }
 
