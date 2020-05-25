@@ -2,7 +2,7 @@
 # Author           : Marek Zalewski ( s180465@student.pg.edu.pl )
 # Created On       : 23/04/2020
 # Last Modified By : Marek Zalewski
-# Last Modified On : 24/05/2020
+# Last Modified On : 25/05/2020
 # Version          : 1.0.0
 # Name             : organizer
 #
@@ -100,7 +100,7 @@ proceed_with_event() {
 	fi
 	local message="$mode \nwystąpiło: $(prepare_date $1) \n$3"
 	
-	zenity --info --title "Wydarzenie" --text="$message" --width=256
+	zero=`zenity --info --title "Wydarzenie" --text="$message" --width=256`
 	
 	if [[ "$2" != "event" ]]; then
 		local newDate=$(get_next_valid_date $1 $2)
@@ -114,6 +114,7 @@ daemon_function() {
 	local line=""
 	local currentDate=$(get_current_date)
 	local tmpFile=$(create_tmp_file_name)
+	echo ""> "$tmpFile"
 	while read line;
 	do
 		if [[ "$line" != "" ]]; then
@@ -136,10 +137,6 @@ daemon_function() {
 	
 	sleep 60
 }
-
-
-
-
 
 list_events() {
 	local lineNumber=0
@@ -239,10 +236,28 @@ get_number() {
 	echo "$(($number + 0))"
 }
 
+select_date() {
+	local choosen=""
+	while [[ "$choosen" == "" ]];
+	do
+		choosen=`zenity --calendar --title "Data" --text="Wybierz datę wydarzenia" --date-format='%Y-%m-%d'`
+	done
+	echo "$choosen"
+}
+
+select_scale() {
+	local value=""
+	while [[ "$value" == "" ]];
+	do
+		value=`zenity --scale --title "$1" --text="$2" --min-value="$3" --max-value="$4" --step=1`
+	done
+	echo "$value"
+}
+
 add_event() {
-	local date=`zenity --calendar --title "Data" --text="Wybierz datę wydarzenia" --date-format='%Y-%m-%d'`
-	local hour=`zenity --scale --title "Godzina" --text="Wybierz godzinę wydarzenia" --min-value=0 --max-value=23 --step=1`
-	local minute=`zenity --scale --title "Minuta" --text="Wybierz minutę wydarzenia" --min-value=0 --max-value=59 --step=1`
+	local date=$(select_date)
+	local hour=$(select_scale "Godzina" "Wybierz godzinę wydarzenia" "0" "23")
+	local minute=$(select_scale "Minuta" "Wybierz minutę wydarzenia" "0" "59")
 	while [[ "1" == "1" ]];
 	do
 		local text=`zenity --entry --title "Treść wydarzenia" --text="Napisz o czym jest wydarzenie"`
@@ -257,11 +272,11 @@ add_event() {
 	then
 		while [[ "1" == "1" ]];
 		do
-			local years=`get_number "Lata" "Co ile lat ma się powtarzać wydarzenie?"`
-			local months=`zenity --scale --title "Miesiące" --text="Co ile miesięcy ma się powtarzać wydarzenie?" --min-value=0 --max-value=11 --step=1`
-			local days=`zenity --scale --title "Dni" --text="Co ile dni ma się powtarzać wydarzenie?" --min-value=0 --max-value=366 --step=1`
-			local hours=`zenity --scale --title "Godziny" --text="Co ile godzin ma się powtarzać wydarzenie?" --min-value=0 --max-value=23 --step=1`
-			local minutes=`zenity --scale --title "Minuty" --text="Co ile minut ma się powtarzać wydarzenie?" --min-value=0 --max-value=59 --step=1`
+			local years=$(get_number "Lata" "Co ile lat ma się powtarzać wydarzenie?")
+			local months=$(select_scale "Miesiące" "Co ile miesięcy ma się powtarzać wydarzenie?" "0" "11")
+			local days=$(select_scale "Dni" "Co ile dni ma się powtarzać wydarzenie?" "0" "366")
+			local hours=$(select_scale "Godziny" "Co ile godzin ma się powtarzać wydarzenie?" "0" "23")
+			local minutes=$(select_scale "Minuty" "Co ile minut ma się powtarzać wydarzenie?" "0" "59")
 			mode="$years-$months-$days-$hours-$minutes"
 			if [[ "$mode" != "0-0-0-0-0" ]]; then
 				break
@@ -339,7 +354,7 @@ make_sure_file_exists
 case $1 in
 	"startdaemon")
 		if [[ "$(is_daemon_running)" == "0" ]]; then
-			$0 daemonloop
+			$0 daemonloop & > /dev/null 2>&1
 		fi
 		;;
 	"daemonloop")
