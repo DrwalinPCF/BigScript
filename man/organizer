@@ -1,0 +1,34 @@
+./" Manpage for Organizer - Project for: Systemy Operacyjne 2020 (sem. zimowy) PG ETI INF st. 1, sem. 2
+.TH man 1 "30 May 2020" "1.0.0" "organizer man page"
+.SH NAME
+organizer - helps with task scheduling and organizing workflow.
+.SH SYNOPSIS
+organizer [OPTIONS]
+.SH DESCRIPTION
+Organizer helps with organizing workflow and task scheduling.
+.SH OPTIONS
+-v or --version or -V
+        Print version of script.
+
+-h or --help or help or -H or ?
+        Prints simple help string.
+
+startdaemon
+        Can be used to manually run daemon.
+
+daemonloop
+        Restricted to use by script itself.
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+Written by Marek Zalewski aka Drwalin (github.com/DrwalinPCF), s180465 student PG ETI INF st. 1, sem. 2
+.SH REPORTING BUGS
+Please report bugs at: github.com/DrwalinPCF/BigScript/issues
+.SH COPYRIGHTS
+Licensed under GPL (see /usr/share/common-licenses/GPL for more details or contact # the Free Software Foundation for a copy.
+.SH EXAMPLES
+To have pomodoro timer: you can add an event with period of 1 hour and 15 minutes and call it pomodoro.
+Script is intuitive and self explanatory in polish language.
+.SH FILES
+~/.organizer/taskSchedule
+        Wile with all scheduled task and events

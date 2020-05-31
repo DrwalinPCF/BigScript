@@ -59,7 +59,7 @@ prepare_period_time() {
 	fi
 	
 	if [[ "$(($minutes + 0))" -ne "0" ]]; then
-		minutes="$minutes minuts"
+		minutes="$minutes minutes"
 	else
 		minutes=""
 	fi
@@ -135,7 +135,7 @@ daemon_function() {
 	
 	mv "$tmpFile" "$fileWithSchedule"
 	
-	sleep 60
+	sleep 5
 }
 
 list_events() {
@@ -366,7 +366,7 @@ case $1 in
 	"-v"|"--version"|"-V")
 		echo "Organizer 1.0.0"
 		echo "Created by Marek Zalewski s180465 PG ETI Student 2. semestru I stopnia kierunku Informatyki, grupa dziekańśka nr. 5, zajęcia pn_10"
-		echo "Last commit: 18.05.2020"
+		echo "Last commit: 25.05.2020"
 		;;
 	"-h"|"--help"|"?"|"help"|"-H")
 		echo "To run type in terminal: $0"
